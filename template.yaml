@@ -141,9 +141,13 @@ Resources:
       DisplayName: !Sub 'trapheus-${AWS::AccountId}-${AWS::Region}'
       Subscription:
         - Protocol: lambda
-          Endpoint: !GetAtt DBRestoreLambdaFunction.Arn
-        - Protocol: lambda
-          Endpoint: !GetAtt RenameLambdaFunction.Arn
+          Endpoint: !GetAtt DbInstanceStatusLambdaFunction.Arn
+
+  RDSEventSubscription:
+    Type: AWS::RDS::EventSubscription
+    Properties:
+      Enabled: true
+      SnsTopicArn: !Ref SNSTopic
 
   CommonLambdaLayer:
     Type: AWS::Serverless::LayerVersion
@@ -184,6 +188,12 @@ Resources:
       Runtime: python3.7
       CodeUri: src/checkstatus/
       Handler: get_dbstatus_function.lambda_get_dbinstance_status
+      Events:
+        SNSTrigger:
+          Type: SNS
+          Properties:
+            Topic:
+              Ref: SNSTopic
       MemorySize: 128
       Layers:
         - !Ref CommonLambdaLayer
@@ -500,14 +510,8 @@ Resources:
         !Sub
         - |-
           {
-            "StartAt": "RDSEventSubscription",
+            "StartAt": "ShouldRestoreClusterOrInstance",
             "States": {
-              "RDSEventSubscription": {
-                "Type": "Task",
-                "Resource": "${EventSubscriptionLambdaArn}",
-                "Next": "ShouldRestoreClusterOrInstance",
-                "ResultPath": "$.output"
-              },
               "ShouldRestoreClusterOrInstance": {
                 "Type": "Choice",
                   "Choices": [{
@@ -788,6 +792,9 @@ Resources:
               "GetDbSnapshotStatus": {
                 "Type": "Task",
                 "Resource": "${DBStatusLambdaArn}",
+                "Parameters": {
+                  "TopicArn": "${SNSTopicArn}"
+                },
                 "Next": "IsDbSnapshotAvailable",
                 "Retry": [{
                   "ErrorEquals": ["InstanceUnavailableException"],
@@ -1170,7 +1177,8 @@ Resources:
             DBSnapshotExportLambdaArn: !GetAtt SnapshotExportLambdaFunction.Arn,
             EmailAlertLambdaArn: !GetAtt EmailAlertLambdaFunction.Arn,
             SlackAlertLambdaArn: !GetAtt SlackAlertLambdaFunction.Arn,
-            EventSubscriptionLambdaArn: !GetAtt EventSubscriptionLambdaFunction.Arn
+            EventSubscriptionLambdaArn: !GetAtt EventSubscriptionLambdaFunction.Arn,
+            SNSTopicArn: !Ref SNSTopic
           }
       RoleArn: !GetAtt StatesExecutionRole.Arn
 
