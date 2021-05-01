@@ -486,23 +486,6 @@ Resources:
         SecurityGroupIds: !Split [ "," , !GetAtt LambdaSecurityGroup.GroupId ]
         SubnetIds: !Split [ "," , !Ref Subnets ]
 
-  EventSubscriptionLambdaFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: !Sub ${ProjectName}-create-event-subscription-sf
-      Description: Lambda function for creating event subscriptions for the state machine.
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Runtime: python3.7
-      CodeUri: src/eventing/
-      Handler: create_event_subscription.lambda_create_event_subscription
-      MemorySize: 128
-      Layers:
-        - !Ref CommonLambdaLayer
-      Timeout: 900
-      Environment:
-        Variables:
-          SNS_TOPIC_ARN: !Ref SNSTopic
-
   DBRestoreStateMachine:
     Type: AWS::StepFunctions::StateMachine
     Properties:
